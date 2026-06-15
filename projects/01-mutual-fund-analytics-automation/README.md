@@ -49,9 +49,11 @@ src/
   fetch_benchmark.py   # NIFTY 50 history, cached to data/raw/nifty50.csv
   metrics.py            # returns (CAGR), Beta, Sharpe, Jensen's Alpha, Consistency
   scoring.py            # eligibility filter + weighted composite score + ranking
-  report.py             # multi-sheet Excel output (TODO)
-  main.py               # pipeline entrypoint (TODO)
+  report.py             # multi-sheet Excel output -> output/fund_rankings.xlsx
+  main.py               # pipeline entrypoint - runs all steps in order
 ```
+
+Run the whole pipeline with `python src/main.py` (from the project root). Fetch steps are skipped if their cached output already exists.
 
 ## Assumptions
 - **Risk-free rate**: 7% (proxy for India 10Y G-Sec yield), used for Sharpe/Alpha.
@@ -62,4 +64,4 @@ src/
 93 of 184 funds pass eligibility. Every category retains at least 3 eligible funds (Multi Cap is the tightest at 4, due to SEBI's 2020 category redefinition creating mostly newer funds in that category). See `data/processed/scored_funds.csv` for the full ranked list.
 
 ## Status
-In progress — see [PROJECTS.md](C:\Users\VEER\.claude\PROJECTS.md) for overall tracker.
+**Pipeline complete and working end-to-end** (`python src/main.py` -> `output/fund_rankings.xlsx`). Remaining polish: clean up `data/raw/mutual_fund_data.csv` dependency (currently a manually-downloaded file, not fetched by a script), and optionally add a small write-up of methodology for the portfolio site. See [PROJECTS.md](C:\Users\VEER\.claude\PROJECTS.md) for overall tracker.

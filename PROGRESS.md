@@ -42,5 +42,13 @@ Order: **#1 Mutual Fund Analytics Automation → #2 AI Asset Allocation Tool →
 - `src/scoring.py` complete and run: **93/184 funds eligible** (AUM>=1000cr AND 5yr track record). Every category has >=3 eligible funds (Multi Cap tightest at 4). Composite score = equal-weighted (1/3 each) percentile ranks of Sharpe/Alpha/Consistency within category -> `data/processed/scored_funds.csv`. Top picks per category look sensible (recognizable AMCs, coherent metric combos).
 - README updated with assumptions (risk-free rate, lookback window, AUM threshold) and current results summary.
 
+- `src/report.py` complete: writes `output/fund_rankings.xlsx` (Summary sheet + one sheet per category, top-3 highlighted, formatted via openpyxl).
+- `src/main.py` complete: runs the full pipeline (`python src/main.py`), skipping fetch steps whose cached output already exists. **Ran end-to-end successfully.**
+
+## Project 1 Status: PIPELINE COMPLETE
+Remaining polish items (not blocking):
+- `data/raw/mutual_fund_data.csv` is currently a manually-downloaded file (not fetched by a script) - either document this clearly or write a small fetch script.
+- Could add a methodology write-up section to README for the portfolio site.
+
 ## Next Step
-Build `src/report.py` (multi-sheet Excel output via openpyxl - one sheet per category highlighting top picks, plus a summary sheet) and `src/main.py` (pipeline entrypoint chaining all steps). Pipeline is otherwise functionally complete end-to-end.
+Decide with Veer: polish remaining items for Project 1, or move on to Project #6 (Goal Planning/SIP Calculator) or another project per the overall order in this file's "Overall Plan" section.
