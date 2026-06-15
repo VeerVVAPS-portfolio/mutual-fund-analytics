@@ -20,11 +20,16 @@ Order: **#1 Mutual Fund Analytics Automation → #2 AI Asset Allocation Tool →
 - **New project discovered:** "Portfolio"/"Calculation & Assumption"/"Projection" sheets in the same Excel = a separate goal-planning/SIP calculator tool → added as **Project #6** in global `PROJECTS.md`.
 
 ## Current Status: Project 1 — Mutual Fund Analytics Automation
-**Status:** Design finalized, scaffold created, no code written yet.
+**Status:** `fetch_schemes.py` done and run successfully.
+
+- **Category scope expanded from 4 -> 10** diversified equity categories (Large Cap, Large & Mid Cap, Mid Cap, Small Cap, Multi Cap, Flexi Cap, Value, Focused, Dividend Yield, ELSS) — confirmed 2026-06-15, sectoral/debt/hybrid/index deferred to later.
+- **AUM data source resolved:** `InertExpert2911/Mutual_Fund_Data` GitHub CSV (AMFI-derived, per-plan Average_AUM_Cr) — downloaded to `data/raw/mutual_fund_data.csv` (gitignored).
+- `src/fetch_schemes.py` builds one row per fund: sums AUM across all plans, picks Direct Growth as reference plan (Regular Growth fallback). Result: **184 of 186 funds** got a usable reference plan -> `data/processed/schemes.csv`. The 2 skipped (Samco Mid Cap, Samco Small Cap) have non-standard plan names with no "Growth" keyword and are tiny/new funds — left out for now, low impact.
+- Removed `src/explore_data.py` (exploration scratch file, no longer needed).
+- README.md updated to document the 10-category scope.
 
 **Open/unresolved:**
-- AUM data source for ~2000 schemes at scale not yet confirmed (AMFI's NAVAll.txt doesn't include AUM directly — need to find/research a scheme-wise AUM source).
-- MoneyControl star rating can't be replicated at scale (proprietary) — likely need an objective substitute (e.g., consistency of returns) for any "quality" filter.
+- Risk-free rate assumption for Sharpe/Alpha (CAPM) not yet chosen — likely ~7% based on India 10Y G-sec, to confirm when we get to `metrics.py`.
 
 ## Next Step
-Research AUM data source for ~2000 schemes (open question), then start `src/fetch_schemes.py`: pull AMFI `NAVAll.txt`, parse scheme list + category classification (Large/Mid/Small Cap, ELSS), teaching pandas basics (reading data, filtering, string parsing) along the way.
+Build `src/fetch_nav_history.py`: for each of the 184 `scheme_code`s in `schemes.csv`, pull historical NAV from `mfapi.in/mf/{scheme_code}` and cache each response to `data/raw/nav_history/` as JSON (so re-runs are resumable and don't re-hit the API). This is where we'll introduce making API calls with `requests`, looping over a DataFrame, and basic caching patterns.

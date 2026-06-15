@@ -11,7 +11,7 @@ Automates the mutual fund screening & ranking process Veer originally did manual
 
 ## Automated, Improved Version (this project)
 
-**Scope:** All AMFI-registered equity mutual fund schemes (~2000), not just a hand-picked shortlist.
+**Scope:** All diversified equity mutual fund schemes across **10 categories** — Large Cap, Large & Mid Cap, Mid Cap, Small Cap, Multi Cap, Flexi Cap, Value, Focused, Dividend Yield, and ELSS (184 active funds as of June 2026). Originally limited to the 4 categories in the manual template (Large/Mid/Small Cap, ELSS); expanded to cover all diversified equity categories that share NIFTY 50 as a benchmark. Sectoral/thematic, debt, hybrid, and index funds are excluded since they need different benchmarks or scoring logic — candidates for a future extension.
 
 ### Why not just "normalize everything and weight it"?
 
