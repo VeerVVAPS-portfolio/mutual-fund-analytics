@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+projects/01-mutual-fund-analytics-automation/data/raw/
