@@ -10,6 +10,7 @@ import os
 
 from fetch_benchmark import main as fetch_benchmark
 from fetch_nav_history import main as fetch_nav_history
+from fetch_raw_data import main as fetch_raw_data
 from fetch_schemes import build_schemes_table
 from metrics import main as compute_metrics
 from scoring import main as score_funds
@@ -17,12 +18,15 @@ from report import main as build_report
 
 
 def main():
+    print("=== Step 0: Fetching raw AMFI scheme/AUM data ===")
+    fetch_raw_data()
+
     if not os.path.exists("data/processed/schemes.csv"):
-        print("=== Step 1: Building scheme universe ===")
+        print("\n=== Step 1: Building scheme universe ===")
         schemes = build_schemes_table("data/raw/mutual_fund_data.csv")
         schemes.to_csv("data/processed/schemes.csv", index=False)
     else:
-        print("=== Step 1: schemes.csv already exists, skipping ===")
+        print("\n=== Step 1: schemes.csv already exists, skipping ===")
 
     if not os.path.exists("data/raw/nifty50.csv"):
         print("\n=== Step 2: Fetching NIFTY 50 benchmark ===")

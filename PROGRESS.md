@@ -45,10 +45,10 @@ Order: **#1 Mutual Fund Analytics Automation → #2 AI Asset Allocation Tool →
 - `src/report.py` complete: writes `output/fund_rankings.xlsx` (Summary sheet + one sheet per category, top-3 highlighted, formatted via openpyxl).
 - `src/main.py` complete: runs the full pipeline (`python src/main.py`), skipping fetch steps whose cached output already exists. **Ran end-to-end successfully.**
 
+- `src/fetch_raw_data.py` added (Step 0): downloads `mutual_fund_data.csv` from GitHub, skips if cached. Pipeline is now fully self-contained, no manual downloads.
+
 ## Project 1 Status: PIPELINE COMPLETE
-Remaining polish items (not blocking):
-- `data/raw/mutual_fund_data.csv` is currently a manually-downloaded file (not fetched by a script) - either document this clearly or write a small fetch script.
-- Could add a methodology write-up section to README for the portfolio site.
+Veer asked about adding an interactive dashboard (Streamlit) on top of this - in progress now (see below).
 
 ## Next Step
-Decide with Veer: polish remaining items for Project 1, or move on to Project #6 (Goal Planning/SIP Calculator) or another project per the overall order in this file's "Overall Plan" section.
+Building a Streamlit dashboard (`dashboard/app.py`) for Project 1: category selector, ranked table, and interactive weight sliders (Sharpe/Alpha/Consistency) that recompute the composite score live using metrics.csv. After that, decide: more Project 1 polish, or move to Project #6 (Goal Planning/SIP Calculator) per the "Overall Plan" order.

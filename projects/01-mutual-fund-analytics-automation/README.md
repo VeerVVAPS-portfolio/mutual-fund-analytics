@@ -36,10 +36,9 @@ Percentile-rank normalization (Morningstar-style: "beats X% of peers on this met
 Rank within each category; output top N per category plus full ranked list.
 
 ## Data Sources
-- **Scheme list & categories:** AMFI `NAVAll.txt`
-- **Historical NAV (for returns/Beta/Sharpe):** `mfapi.in` (free, mirrors AMFI data)
-- **Benchmark (NIFTY 50, for Beta):** `yfinance` (`^NSEI`)
-- **AUM:** TBD — researching a scheme-wise source (AMFI average AUM reports)
+- **Scheme list, categories & AUM:** [InertExpert2911/Mutual_Fund_Data](https://github.com/InertExpert2911/Mutual_Fund_Data) (AMFI-derived, per-plan Average AUM)
+- **Historical NAV (for returns/Beta/Sharpe/Alpha):** `mfapi.in` (free, mirrors AMFI data)
+- **Benchmark (NIFTY 50, for Beta/Alpha):** `yfinance` (`^NSEI`)
 
 ## Pipeline
 ```
@@ -64,4 +63,4 @@ Run the whole pipeline with `python src/main.py` (from the project root). Fetch 
 93 of 184 funds pass eligibility. Every category retains at least 3 eligible funds (Multi Cap is the tightest at 4, due to SEBI's 2020 category redefinition creating mostly newer funds in that category). See `data/processed/scored_funds.csv` for the full ranked list.
 
 ## Status
-**Pipeline complete and working end-to-end** (`python src/main.py` -> `output/fund_rankings.xlsx`). Remaining polish: clean up `data/raw/mutual_fund_data.csv` dependency (currently a manually-downloaded file, not fetched by a script), and optionally add a small write-up of methodology for the portfolio site. See [PROJECTS.md](C:\Users\VEER\.claude\PROJECTS.md) for overall tracker.
+**Pipeline complete and working end-to-end** (`python src/main.py` -> `output/fund_rankings.xlsx`), fully self-contained (no manual downloads). See [PROJECTS.md](C:\Users\VEER\.claude\PROJECTS.md) for overall tracker.
