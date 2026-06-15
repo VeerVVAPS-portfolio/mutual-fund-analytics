@@ -28,8 +28,10 @@ Order: **#1 Mutual Fund Analytics Automation → #2 AI Asset Allocation Tool →
 - Removed `src/explore_data.py` (exploration scratch file, no longer needed).
 - README.md updated to document the 10-category scope.
 
+- `src/fetch_nav_history.py` done and run successfully: all **184/184 funds** cached to `data/raw/nav_history/{scheme_code}.json` (full daily NAV history per fund, e.g. 2,951 records spanning 2014-2026 for a typical fund). API (`mfapi.in`) is slow (~13s/request for full history) but caching makes this a one-time cost; script is resumable (skips already-cached files). First run: 167/184 succeeded, 17 timed out at 15s; retried with 30s timeout -> 0 failures.
+
 **Open/unresolved:**
-- Risk-free rate assumption for Sharpe/Alpha (CAPM) not yet chosen — likely ~7% based on India 10Y G-sec, to confirm when we get to `metrics.py`.
+- Risk-free rate assumption for Sharpe/Alpha (CAPM) — asked Veer to confirm hardcoding ~7% (India 10Y G-sec proxy); awaiting answer before starting `metrics.py`.
 
 ## Next Step
-Build `src/fetch_nav_history.py`: for each of the 184 `scheme_code`s in `schemes.csv`, pull historical NAV from `mfapi.in/mf/{scheme_code}` and cache each response to `data/raw/nav_history/` as JSON (so re-runs are resumable and don't re-hit the API). This is where we'll introduce making API calls with `requests`, looping over a DataFrame, and basic caching patterns.
+Once risk-free rate is confirmed, build `src/metrics.py`: from cached NAV history, compute daily returns (`pct_change`), CAGR (1Y/3Y/5Y/10Y), Beta vs NIFTY 50 (via `yfinance` `^NSEI`), Sharpe Ratio, Jensen's Alpha (CAPM), and the Consistency metric (rolling 3yr win-rate vs category average).
