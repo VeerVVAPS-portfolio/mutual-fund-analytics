@@ -20,19 +20,20 @@ st.set_page_config(page_title="Fund Rankings", layout="wide")
 
 # ── Shared style constants ────────────────────────────────────────────────────
 
-FONT_COLOR = "#1F2937"        # near-black, readable on any light background
-GRID_COLOR = "#E5E7EB"        # subtle grid lines
-ACCENT_GREEN = "#059669"      # top-3 bars and highlights
-ACCENT_PURPLE = "#6366F1"     # other funds
-TOP3_BG = "#D1FAE5"           # light green row highlight
-TOP3_FG = "#065F46"           # dark green text on light green — WCAG AA
-TRANSPARENT = "rgba(0,0,0,0)" # seamless chart background
+CHART_FONT  = "#E2E8F0"        # light — readable on Streamlit dark background
+HOVER_FONT  = "#1F2937"        # dark — for white hover-label popups
+GRID_COLOR  = "#4B5563"        # mid-gray grid lines on dark bg
+ACCENT_GREEN  = "#10B981"      # top-3 bars and highlights
+ACCENT_PURPLE = "#818CF8"      # other funds (lighter indigo — visible on dark)
+TOP3_BG = "#D1FAE5"            # light green row highlight in table
+TOP3_FG = "#065F46"            # dark green text on light green — WCAG AA
+TRANSPARENT = "rgba(0,0,0,0)"  # seamless chart background
 
 PLOTLY_BASE = dict(
     paper_bgcolor=TRANSPARENT,
     plot_bgcolor=TRANSPARENT,
-    font=dict(color=FONT_COLOR, family="Inter, sans-serif", size=12),
-    hoverlabel=dict(bgcolor="white", font_size=13, font_color=FONT_COLOR),
+    font=dict(color=CHART_FONT, family="Inter, sans-serif", size=12),
+    hoverlabel=dict(bgcolor="white", font_size=13, font_color=HOVER_FONT),
 )
 
 # ── Data ─────────────────────────────────────────────────────────────────────
@@ -248,7 +249,7 @@ def highlight_top3(row):
     if row["Rank"] <= 3:
         style = f"background-color: {TOP3_BG}; color: {TOP3_FG}; font-weight: 600"
     else:
-        style = f"color: {FONT_COLOR}"
+        style = ""
     return [style] * len(row)
 
 
@@ -311,13 +312,13 @@ bar_fig.update_layout(
         showgrid=True,
         gridcolor=GRID_COLOR,
         zeroline=False,
-        tickfont=dict(color=FONT_COLOR, size=11),
+        tickfont=dict(color=CHART_FONT, size=11),
         title=dict(text="Composite Score (percentile rank vs category peers)",
-                   font=dict(color=FONT_COLOR, size=11)),
+                   font=dict(color=CHART_FONT, size=11)),
     ),
     yaxis=dict(
         autorange=True,
-        tickfont=dict(color=FONT_COLOR, size=11),
+        tickfont=dict(color=CHART_FONT, size=11),
         showgrid=False,
     ),
 )
@@ -330,7 +331,7 @@ bar_fig.add_annotation(
         f"<span style='color:{ACCENT_PURPLE}'>&#9632;</span> Others"
     ),
     showarrow=False,
-    font=dict(size=11, color=FONT_COLOR),
+    font=dict(size=11, color=CHART_FONT),
     align="right",
     xanchor="right",
 )
@@ -376,12 +377,12 @@ radar_fig.update_layout(
             visible=True,
             range=[0, 1],
             tickformat=".0%",
-            tickfont=dict(size=10, color=FONT_COLOR),
+            tickfont=dict(size=10, color=CHART_FONT),
             gridcolor=GRID_COLOR,
             linecolor=GRID_COLOR,
         ),
         angularaxis=dict(
-            tickfont=dict(size=13, color=FONT_COLOR),
+            tickfont=dict(size=13, color=CHART_FONT),
             linecolor=GRID_COLOR,
             gridcolor=GRID_COLOR,
         ),
@@ -391,7 +392,7 @@ radar_fig.update_layout(
         orientation="h",
         yanchor="bottom", y=-0.28,
         xanchor="center", x=0.5,
-        font=dict(color=FONT_COLOR, size=11),
+        font=dict(color=CHART_FONT, size=11),
     ),
 )
 
