@@ -32,7 +32,6 @@ PLOTLY_BASE = dict(
     paper_bgcolor=TRANSPARENT,
     plot_bgcolor=TRANSPARENT,
     font=dict(color=FONT_COLOR, family="Inter, sans-serif", size=12),
-    margin=dict(l=10, r=10, t=10, b=10),
     hoverlabel=dict(bgcolor="white", font_size=13, font_color=FONT_COLOR),
 )
 
@@ -210,7 +209,6 @@ left, mid, r1, r2, r3 = st.columns([3, 2, 1.5, 1.5, 1.5])
 
 with left:
     st.markdown(f"**{top_display}**")
-    st.caption(top["scheme_name"])          # full name in small text below
 
 with mid:
     st.markdown(f"**AMC**")
