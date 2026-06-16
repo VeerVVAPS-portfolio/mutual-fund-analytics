@@ -78,3 +78,7 @@ streamlit run dashboard/app.py
 
 ## Status
 **Pipeline complete and working end-to-end** (`python src/main.py` -> `output/fund_rankings.xlsx`), fully self-contained (no manual downloads). See [PROJECTS.md](C:\Users\VEER\.claude\PROJECTS.md) for overall tracker.
+
+---
+
+*Methodology, financial parameters, and domain logic designed by Veer Pratap Singh. Built with Python and Claude Code (AI-assisted development).*
