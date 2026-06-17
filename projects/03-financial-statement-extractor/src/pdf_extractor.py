@@ -316,18 +316,22 @@ _FIN_NUM_RE = re.compile(r'\(?\b\d{1,3}(?:,\d{2,3})+(?:\.\d+)?\b\)?')
 # Trailing note references like "2.18" or "2.1" that appear after the label
 _NOTE_REF_RE = re.compile(r'\s+\d{1,2}\.\d{1,2}\s*$')
 
+# All note references anywhere in a line (used in fallback path)
+# Format is always X.Y or X.YZ where X and Y are 1-2 digits each
+_ALL_NOTE_REFS_RE = re.compile(r'\b\d{1,2}\.\d{1,2}\b')
+
+# Plain integers ≥ 2 digits (used as fallback for values < 1,000 with no comma)
+_PLAIN_INT_RE = re.compile(r'\b(\d{2,})\b')
+
 
 def _text_to_table(text: str) -> list[list[str]]:
     """
     Parse raw page text into a financial table.
 
-    For each line:
-    - Finds all comma-formatted numbers (financial values).
-    - Strips trailing note references (e.g. "2.18") from the label.
-    - Returns [label, value1, value2, ...] rows.
-
-    This handles PDFs like Infosys where extract_tables() produces
-    duplication artifacts but extract_text() is clean.
+    Primary path: finds comma-grouped numbers (162,990) — unambiguous financial values.
+    Fallback path: for lines with no comma-grouped numbers, strips note references
+    (X.Y format like "2.18"), then captures plain integers ≥ 2 digits.
+    This handles small values like Finance Cost = 416 Cr that don't need commas.
     """
     rows: list[list[str]] = []
 
@@ -338,17 +342,33 @@ def _text_to_table(text: str) -> list[list[str]]:
 
         fin_nums = _FIN_NUM_RE.findall(line)
 
-        if not fin_nums:
-            # Section header or label-only row (no financial numbers)
-            rows.append([line])
-            continue
+        if fin_nums:
+            # Primary path: comma-formatted numbers found — extract label + values.
+            first_match = _FIN_NUM_RE.search(line)
+            label = line[: first_match.start()].strip()  # type: ignore[union-attr]
+            label = _NOTE_REF_RE.sub("", label).strip()
+            rows.append([label] + fin_nums)
+        else:
+            # Fallback path: no comma-formatted numbers.
+            # Strip ALL note references (e.g. "2.18") from the line first,
+            # then look for plain integers at the end — these are values < 1,000 Cr.
+            # Example: "Finance cost  2.18  416  470" → strip "2.18" → find [416, 470]
+            stripped = _ALL_NOTE_REFS_RE.sub("", line).strip()
+            plain_nums = _PLAIN_INT_RE.findall(stripped)
 
-        # Label = everything before the first financial number
-        first_match = _FIN_NUM_RE.search(line)
-        label = line[: first_match.start()].strip()  # type: ignore[union-attr]
-        # Strip trailing note reference (e.g. "2.18") from label
-        label = _NOTE_REF_RE.sub("", label).strip()
-
-        rows.append([label] + fin_nums)
+            if len(plain_nums) >= 2 and all(int(n) >= 100 for n in plain_nums[:2]):
+                # Two+ bare integers where both are ≥ 100 → year-column values
+                # (filters out "April 17, 2025" where 17 < 100)
+                first_plain = _PLAIN_INT_RE.search(stripped)
+                label = stripped[: first_plain.start()].strip()  # type: ignore[union-attr]
+                rows.append([label] + plain_nums)
+            elif len(plain_nums) == 1 and int(plain_nums[0]) >= 100:
+                # Single integer ≥ 100 → large enough to be a financial value
+                first_plain = _PLAIN_INT_RE.search(stripped)
+                label = stripped[: first_plain.start()].strip()  # type: ignore[union-attr]
+                rows.append([label] + plain_nums)
+            else:
+                # No usable numbers — section header or label-only row.
+                rows.append([line])
 
     return rows
