@@ -46,7 +46,7 @@ html, body, [class*="css"] {
     color: #E4E4E7 !important;
 }
 
-/* ── CRED colour system (matches Project 1) ── */
+/* ── Colour system (matches Project 1) ── */
 :root {
     --bg:    #0A0A0E;
     --surf:  #111116;
@@ -227,7 +227,7 @@ div[data-testid="stRadio"] > div > label > div:first-child { display: none !impo
 .bar-reason { margin-top: 0.4rem; font-size: 0.76rem; color: var(--t3); line-height: 1.6; }
 .compare-note { font-size: 0.73rem; color: var(--t4); margin-top: 0.4rem; text-align: center; }
 
-/* ── SIP statement (CRED style: big number, no card box) ── */
+/* ── SIP statement (big number, no card box) ── */
 .sip-card {
     padding: 1.8rem 0 1.2rem;
     border-top: 1px solid var(--rule);

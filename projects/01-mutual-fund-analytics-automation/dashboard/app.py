@@ -31,7 +31,7 @@ html, body, [class*="css"] {
     color: #E4E4E7 !important;
 }
 
-/* ── CRED colour system ── */
+/* ── Colour system ── */
 :root {
     --bg:      #0A0A0E;
     --surf:    #111116;
@@ -112,7 +112,7 @@ html, body, [class*="css"] {
 }
 .sec-head-line { flex: 1; height: 1px; background: var(--rule); }
 
-/* ── Top pick — CRED style: content on canvas, no card box ── */
+/* ── Top pick — content on canvas, no card box ── */
 .tp-wrap { padding: 0.5rem 0 1.5rem; animation: fadeUp 0.5s ease both; }
 .tp-rank {
     font-size: 0.65rem; font-weight: 600; letter-spacing: 0.14em;
