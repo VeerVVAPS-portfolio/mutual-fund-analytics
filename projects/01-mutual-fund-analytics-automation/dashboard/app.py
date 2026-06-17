@@ -16,24 +16,176 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from scoring import apply_eligibility_filter, compute_composite_score  # noqa: E402
 
-st.set_page_config(page_title="Fund Rankings", layout="wide")
+st.set_page_config(page_title="Fund Rankings | Mutual Fund Analytics", layout="wide")
+
+# ── CSS ───────────────────────────────────────────────────────────────────────
+
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+    background-color: #0A0A0E !important;
+    color: #E4E4E7 !important;
+}
+
+/* ── CRED colour system ── */
+:root {
+    --bg:      #0A0A0E;
+    --surf:    #111116;
+    --surf2:   #18181F;
+    --bdr:     rgba(255,255,255,0.06);
+    --bdr2:    rgba(255,255,255,0.12);
+    --rule:    rgba(255,255,255,0.05);
+    --t1:      #F4F4F5;
+    --t2:      #A1A1AA;
+    --t3:      #71717A;
+    --t4:      #52525B;
+    --acc:     #818CF8;
+    --gold:    #E4C76B;
+    --green:   #10B981;
+    --amber:   #F59E0B;
+    --sky:     #38BDF8;
+}
+
+/* ── Animations ── */
+@keyframes fadeUp   { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn   { from{opacity:0} to{opacity:1} }
+@keyframes countUp  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── Global overrides ── */
+.block-container { padding-top: 2.5rem !important; max-width: 1100px !important; }
+[data-testid="stSidebar"] {
+    background: var(--surf) !important;
+    border-right: 1px solid var(--bdr) !important;
+}
+
+/* ── Sidebar ── */
+.sb-brand {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1rem; font-weight: 700; color: var(--t1);
+    letter-spacing: -0.01em; margin-bottom: 0.15rem;
+}
+.sb-sub { font-size: 0.7rem; color: var(--t4); letter-spacing: 0.04em; text-transform: uppercase; }
+.sb-section {
+    font-size: 0.65rem; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--t4); margin-bottom: 0.5rem;
+}
+
+/* ── Page header ── */
+.ph-wrap { padding: 1rem 0 2.5rem; animation: fadeUp 0.6s ease both; }
+.ph-eyebrow {
+    font-size: 0.68rem; font-weight: 600; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--acc); margin-bottom: 1rem;
+}
+.ph-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 3.8rem; font-weight: 700; line-height: 1.0;
+    letter-spacing: -0.03em; color: var(--t1); margin-bottom: 1.2rem;
+}
+.ph-title span { color: var(--acc); }
+.ph-stats {
+    display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;
+    padding: 1.2rem 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+}
+.ph-stat-num {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.5rem; font-weight: 700; color: var(--t1); line-height: 1;
+}
+.ph-stat-label { font-size: 0.68rem; color: var(--t3); margin-top: 0.2rem; letter-spacing: 0.04em; }
+.ph-divider { width: 1px; height: 2rem; background: var(--rule); }
+
+/* ── Section heading ── */
+.sec-head {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 2rem 0 1rem;
+    border-top: 1px solid var(--rule);
+    animation: fadeUp 0.5s ease both;
+}
+.sec-head-label {
+    font-size: 0.65rem; font-weight: 600; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--t4);
+}
+.sec-head-line { flex: 1; height: 1px; background: var(--rule); }
+
+/* ── Top pick — CRED style: content on canvas, no card box ── */
+.tp-wrap { padding: 0.5rem 0 1.5rem; animation: fadeUp 0.5s ease both; }
+.tp-rank {
+    font-size: 0.65rem; font-weight: 600; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--green); margin-bottom: 0.9rem;
+    display: flex; align-items: center; gap: 0.4rem;
+}
+.tp-rank::before {
+    content: '';
+    display: inline-block; width: 6px; height: 6px;
+    background: var(--green); border-radius: 50%;
+}
+.tp-fund-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 2rem; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--t1); line-height: 1.2; margin-bottom: 0.4rem;
+}
+.tp-amc {
+    font-size: 0.82rem; color: var(--t3); margin-bottom: 2rem;
+}
+.tp-stats {
+    display: flex; gap: 3rem; flex-wrap: wrap;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+}
+.tp-stat { }
+.tp-stat-val {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 2.2rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1;
+    animation: countUp 0.6s ease both;
+}
+.tp-stat-label {
+    font-size: 0.68rem; color: var(--t3); margin-top: 0.35rem;
+    letter-spacing: 0.06em; text-transform: uppercase;
+}
+
+/* ── Method row ── */
+.method-row {
+    display: flex; gap: 0; flex-wrap: nowrap;
+    border: 1px solid var(--bdr); border-radius: 12px; overflow: hidden;
+    margin: 0.5rem 0 1rem; animation: fadeIn 0.7s ease both;
+}
+.method-cell {
+    flex: 1; padding: 1rem 1.2rem;
+    border-right: 1px solid var(--bdr);
+}
+.method-cell:last-child { border-right: none; }
+.method-cell-title {
+    font-size: 0.72rem; font-weight: 600; color: var(--t1);
+    letter-spacing: 0.03em; margin-bottom: 0.25rem;
+    display: flex; align-items: center; gap: 0.35rem;
+}
+.method-cell-title i { color: var(--acc); font-size: 0.75rem; }
+.method-cell-body { font-size: 0.73rem; color: var(--t3); line-height: 1.5; }
+</style>
+""", unsafe_allow_html=True)
 
 # ── Shared style constants ────────────────────────────────────────────────────
 
-CHART_FONT  = "#E2E8F0"        # light — readable on Streamlit dark background
-HOVER_FONT  = "#1F2937"        # dark — for white hover-label popups
-GRID_COLOR  = "#4B5563"        # mid-gray grid lines on dark bg
-ACCENT_GREEN  = "#10B981"      # top-3 bars and highlights
-ACCENT_PURPLE = "#818CF8"      # other funds (lighter indigo — visible on dark)
-TOP3_BG = "#D1FAE5"            # light green row highlight in table
-TOP3_FG = "#065F46"            # dark green text on light green — WCAG AA
-TRANSPARENT = "rgba(0,0,0,0)"  # seamless chart background
+CHART_FONT    = "#71717A"       # zinc-500 — subtle axis labels on dark bg
+HOVER_FONT    = "#F4F4F5"       # near-white text inside hover tooltip
+HOVER_BG      = "#18181F"       # dark tooltip bg
+GRID_COLOR    = "#27272A"       # zinc-800 — barely-visible grid lines
+ACCENT_GREEN  = "#10B981"
+ACCENT_PURPLE = "#818CF8"
+TOP3_BG = "#052e16"             # dark green row highlight for dark theme
+TOP3_FG = "#6ee7b7"             # light green text on dark — WCAG AA
+TRANSPARENT = "rgba(0,0,0,0)"
 
 PLOTLY_BASE = dict(
     paper_bgcolor=TRANSPARENT,
     plot_bgcolor=TRANSPARENT,
-    font=dict(color=CHART_FONT, family="Inter, sans-serif", size=12),
-    hoverlabel=dict(bgcolor="white", font_size=13, font_color=HOVER_FONT),
+    font=dict(color=CHART_FONT, family="Space Grotesk, Inter, sans-serif", size=12),
+    hoverlabel=dict(bgcolor=HOVER_BG, font_size=13, font_color=HOVER_FONT, bordercolor="#27272A"),
 )
 
 # ── Data ─────────────────────────────────────────────────────────────────────
@@ -103,7 +255,14 @@ CONSISTENCY_HELP = (
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
-    st.header("Category")
+    st.markdown(
+        '<div class="sb-brand">Fund Analytics</div>'
+        '<div class="sb-sub">AMFI &nbsp;·&nbsp; Indian Equity</div>',
+        unsafe_allow_html=True,
+    )
+    st.divider()
+
+    st.markdown('<div class="sb-section">Category</div>', unsafe_allow_html=True)
     short_name = lambda c: c.replace("Equity Scheme - ", "").replace(" Fund", "")
     categories = sorted(eligible["category"].unique())
     category = st.selectbox(
@@ -115,7 +274,7 @@ with st.sidebar:
 
     st.divider()
 
-    st.header("Investor Style")
+    st.markdown('<div class="sb-section">Investor Style</div>', unsafe_allow_html=True)
     profile_name = st.selectbox(
         "Profile",
         list(PROFILES.keys()),
@@ -185,50 +344,82 @@ cat_label   = short_name(category)
 
 # ── Page header ───────────────────────────────────────────────────────────────
 
-st.title(f"Mutual Fund Rankings — {cat_label}")
-st.caption(
-    f"{len(eligible)} funds eligible across {eligible['category'].nunique()} categories "
-    f"(AUM ≥ ₹1,000 Cr · 5-year track record)   |   "
-    f"**{len(category_df)} eligible** in {cat_label}"
-)
-
-st.divider()
-
-# ── Top pick ──────────────────────────────────────────────────────────────────
-
-st.subheader("Top Pick")
-
-# Truncate long fund names cleanly
 def short_fund_name(name: str, max_len: int = 32) -> str:
     name = name.replace("Equity Scheme - ", "").replace("(Direct Plan)", "").strip()
     return name if len(name) <= max_len else name[:max_len].rstrip() + "..."
 
 top_display = short_fund_name(top["scheme_name"])
 
-# Card layout: name + AMC on the left, three key stats on the right
-left, mid, r1, r2, r3 = st.columns([3, 2, 1.5, 1.5, 1.5])
+st.markdown(
+    f'<div class="ph-wrap">'
+    f'  <div class="ph-eyebrow">Mutual Fund Analytics</div>'
+    f'  <div class="ph-title">{cat_label}<br><span>Funds.</span></div>'
+    f'  <div class="ph-stats">'
+    f'    <div><div class="ph-stat-num">{len(eligible)}</div><div class="ph-stat-label">Funds screened</div></div>'
+    f'    <div class="ph-divider"></div>'
+    f'    <div><div class="ph-stat-num">{eligible["category"].nunique()}</div><div class="ph-stat-label">Categories</div></div>'
+    f'    <div class="ph-divider"></div>'
+    f'    <div><div class="ph-stat-num">{len(category_df)}</div><div class="ph-stat-label">Eligible in {cat_label}</div></div>'
+    f'    <div class="ph-divider"></div>'
+    f'    <div><div class="ph-stat-num">₹1,000 Cr+</div><div class="ph-stat-label">Min AUM threshold</div></div>'
+    f'  </div>'
+    f'</div>',
+    unsafe_allow_html=True,
+)
 
-with left:
-    st.markdown(f"**{top_display}**")
+# Methodology row
+st.markdown(
+    '<div class="method-row">'
+    '  <div class="method-cell">'
+    '    <div class="method-cell-title"><i class="bi bi-graph-up-arrow"></i> Sharpe Ratio</div>'
+    '    <div class="method-cell-body">Return earned per unit of volatility, trailing 3Y vs 7% G-Sec rate.</div>'
+    '  </div>'
+    '  <div class="method-cell">'
+    '    <div class="method-cell-title"><i class="bi bi-bullseye"></i> Jensen\'s Alpha</div>'
+    '    <div class="method-cell-body">Manager skill — extra return beyond what market Beta alone predicts.</div>'
+    '  </div>'
+    '  <div class="method-cell">'
+    '    <div class="method-cell-title"><i class="bi bi-shield-check"></i> Consistency</div>'
+    '    <div class="method-cell-body">% of rolling 3Y windows where the fund beat its category average.</div>'
+    '  </div>'
+    '</div>',
+    unsafe_allow_html=True,
+)
 
-with mid:
-    st.markdown(f"**AMC**")
-    st.write(top["amc"])
+# ── Top pick ──────────────────────────────────────────────────────────────────
 
-with r1:
-    st.metric("5Y Return", f"{top['return_5y']:.1%}")
+st.markdown(
+    '<div class="sec-head">'
+    '  <div class="sec-head-label">Top Pick</div>'
+    '  <div class="sec-head-line"></div>'
+    '</div>',
+    unsafe_allow_html=True,
+)
 
-with r2:
-    st.metric("Sharpe", f"{top['sharpe']:.2f}", help=SHARPE_HELP)
-
-with r3:
-    st.metric("Consistency", f"{top['consistency']:.0%}", help=CONSISTENCY_HELP)
-
-st.divider()
+st.markdown(
+    f'<div class="tp-wrap">'
+    f'  <div class="tp-rank">Ranked #1 in {cat_label}</div>'
+    f'  <div class="tp-fund-name">{top_display}</div>'
+    f'  <div class="tp-amc">{top["amc"]}</div>'
+    f'  <div class="tp-stats">'
+    f'    <div class="tp-stat"><div class="tp-stat-val" style="color:var(--green)">{top["return_5y"]:.1%}</div><div class="tp-stat-label">5Y Return (CAGR)</div></div>'
+    f'    <div class="tp-stat"><div class="tp-stat-val" style="color:var(--acc)">{top["sharpe"]:.2f}</div><div class="tp-stat-label">Sharpe Ratio</div></div>'
+    f'    <div class="tp-stat"><div class="tp-stat-val" style="color:var(--gold)">{top["consistency"]:.0%}</div><div class="tp-stat-label">Consistency</div></div>'
+    f'    <div class="tp-stat"><div class="tp-stat-val" style="color:var(--sky)">{top["composite_score"]:.0%}</div><div class="tp-stat-label">Composite Score</div></div>'
+    f'  </div>'
+    f'</div>',
+    unsafe_allow_html=True,
+)
 
 # ── Ranked table ──────────────────────────────────────────────────────────────
 
-st.subheader("All Eligible Funds")
+st.markdown(
+    '<div class="sec-head">'
+    '  <div class="sec-head-label">All Eligible Funds</div>'
+    '  <div class="sec-head-line"></div>'
+    '</div>',
+    unsafe_allow_html=True,
+)
 
 display_cols = {
     "category_rank": "Rank",
@@ -269,11 +460,17 @@ styled = (
 
 st.dataframe(styled, use_container_width=True, hide_index=True)
 
-st.divider()
+st.markdown("<br>", unsafe_allow_html=True)
 
 # ── Horizontal bar chart ──────────────────────────────────────────────────────
 
-st.subheader("Composite Score — All Funds")
+st.markdown(
+    '<div class="sec-head">'
+    '  <div class="sec-head-label">Composite Score — All Funds</div>'
+    '  <div class="sec-head-line"></div>'
+    '</div>',
+    unsafe_allow_html=True,
+)
 
 chart_df = category_df.copy()
 chart_df["label"] = (
@@ -338,14 +535,23 @@ bar_fig.add_annotation(
 
 st.plotly_chart(bar_fig, use_container_width=True)
 
-st.divider()
+st.markdown("<br>", unsafe_allow_html=True)
 
 # ── Radar chart (top 3) ───────────────────────────────────────────────────────
 
-st.subheader("Top 3 — Head-to-Head Comparison")
-st.caption(
-    "Each axis shows the fund's percentile rank within the category. "
-    "Outer edge = 100th percentile (best in category)."
+st.markdown(
+    '<div class="sec-head">'
+    '  <div class="sec-head-label">Top 3 — Head-to-Head Comparison</div>'
+    '  <div class="sec-head-line"></div>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+st.markdown(
+    '<div style="font-size:0.78rem;color:var(--t3);margin-bottom:0.75rem">'
+    'Each axis shows the fund\'s percentile rank within the category. '
+    'Outer edge = 100th percentile (best in category).'
+    '</div>',
+    unsafe_allow_html=True,
 )
 
 top3 = category_df[category_df["category_rank"] <= 3].copy()
