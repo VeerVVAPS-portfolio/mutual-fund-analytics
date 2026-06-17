@@ -61,7 +61,7 @@ def _demo_allocation(risk_label: str, monthly_income: int | None) -> dict:
     }
 
 
-# ── Live Grok API call ────────────────────────────────────────────────────────
+# ── Live Groq API call ───────────────────────────────────────────────────────
 
 def get_allocation(
     age: str,
@@ -84,7 +84,7 @@ def get_allocation(
     try:
         from openai import OpenAI
 
-        client = OpenAI(api_key=api_key, base_url="https://api.x.ai/v1")
+        client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
 
         user_message = build_user_message(
             age=age,
@@ -98,7 +98,7 @@ def get_allocation(
         )
 
         response = client.chat.completions.create(
-            model="grok-3-mini",
+            model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_message},

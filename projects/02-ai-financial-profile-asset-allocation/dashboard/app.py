@@ -61,7 +61,7 @@ PLOTLY_BASE = dict(
 def resolve_api_key() -> str | None:
     # 1. Streamlit Cloud secrets
     try:
-        key = st.secrets.get("XAI_API_KEY")
+        key = st.secrets.get("GROQ_API_KEY")
         if key:
             return key
     except Exception:
@@ -72,7 +72,7 @@ def resolve_api_key() -> str | None:
         load_dotenv(PROJECT_ROOT / ".env")
     except ImportError:
         pass
-    return os.environ.get("XAI_API_KEY") or None
+    return os.environ.get("GROQ_API_KEY") or None
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -86,10 +86,10 @@ with st.sidebar:
     api_key = resolve_api_key()
     if not api_key:
         api_key = st.text_input(
-            "Grok API Key",
+            "Groq API Key",
             type="password",
-            placeholder="xai-...",
-            help="Free at [console.x.ai](https://console.x.ai). Leave blank to see a demo.",
+            placeholder="gsk-...",
+            help="Free at [console.groq.com](https://console.groq.com). Leave blank to see a demo.",
         ) or None
 
     st.divider()
