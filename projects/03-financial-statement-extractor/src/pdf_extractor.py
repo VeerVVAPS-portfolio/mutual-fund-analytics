@@ -50,6 +50,19 @@ _PAGE_KEYWORDS: dict[str, list[str]] = {
     ],
 }
 
+# Headings for OTHER report sections that commonly follow the three core
+# statements (Statement of Changes in Equity, then Notes). These aren't one
+# of our three statement types, so the PNL/BS/CF keyword check alone won't
+# catch them — without this, a continuation-page scan can run straight
+# through Changes in Equity and into the Notes section, merging unrelated
+# data into the statement being extracted.
+_OTHER_SECTION_KEYWORDS = [
+    "statement of changes in equity",
+    "notes to the",
+    "notes to standalone",
+    "notes to consolidated",
+]
+
 # Phrases that strongly confirm a page is the ACTUAL financial statement
 _CONFIRM_PHRASES = [
     "for the year ended",
@@ -130,6 +143,21 @@ def _score_page(text: str, lines: list[str]) -> int:
     return score
 
 
+PageRef = tuple[int, str]
+
+
+def _get_page_text(doc, idx: int, column: str, sort: bool = True) -> str:
+    page = doc[idx]
+    if column == "full":
+        return page.get_text(sort=sort) if sort else page.get_text()
+    rect = page.rect
+    if column == "left":
+        clip = fitz.Rect(0, 0, rect.width / 2, rect.height)
+    else:
+        clip = fitz.Rect(rect.width / 2, 0, rect.width, rect.height)
+    return page.get_text(sort=sort, clip=clip) if sort else page.get_text(clip=clip)
+
+
 def find_statement_pages(pdf_file: bytes | BinaryIO) -> dict[str, list[int]]:
     """
     Scan every page, score candidates, return best page indices per statement.
@@ -145,8 +173,8 @@ def find_statement_pages(pdf_file: bytes | BinaryIO) -> dict[str, list[int]]:
     """
     pdf_bytes = pdf_file if isinstance(pdf_file, bytes) else pdf_file.read()
 
-    candidates: dict[str, list[tuple[int, int]]] = {"pnl": [], "bs": [], "cf": []}
-    found: dict[str, list[int]] = {"pnl": [], "bs": [], "cf": []}
+    candidates: dict[str, list[tuple[int, int, str]]] = {"pnl": [], "bs": [], "cf": []}
+    found: dict[str, list[tuple[int, str]]] = {"pnl": [], "bs": [], "cf": []}
 
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     total_pages = len(doc)
@@ -158,57 +186,85 @@ def find_statement_pages(pdf_file: bytes | BinaryIO) -> dict[str, list[int]]:
     # PDF's internal content-stream order — without it, page titles placed in
     # a separate text block (common in InDesign exports) can end up last.
     # Cached lazily since most pages never need it.
-    sorted_cache: dict[int, str] = {}
+    sorted_cache: dict[tuple[int, str], str] = {}
 
-    def get_sorted_text(idx: int) -> str:
-        if idx not in sorted_cache:
-            sorted_cache[idx] = doc[idx].get_text(sort=True)
-        return sorted_cache[idx]
+    def get_sorted_text(idx: int, column: str = "full") -> str:
+        key = (idx, column)
+        if key not in sorted_cache:
+            sorted_cache[key] = _get_page_text(doc, idx, column, sort=True)
+        return sorted_cache[key]
 
     candidate_pages = [
         i for i, t in enumerate(unsorted_texts)
         if any(kw in t.lower() for kw in all_keywords)
     ]
 
+    # Check each candidate page in three views: full page, left half, right
+    # half. Some reports run two statements side by side on one physical
+    # page (e.g. Maruti's Balance Sheet + P&L) — the unsplit text is too long
+    # to pass the heading-length check, but each half on its own reads clean.
     for i in candidate_pages:
-        text = get_sorted_text(i)
-        lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
-
-        for stmt_type, keywords in _PAGE_KEYWORDS.items():
-            # Must be a heading — keyword in first 10 lines as a short line
-            if not _keyword_in_heading(lines, keywords):
+        for column in ("full", "left", "right"):
+            text = get_sorted_text(i, column)
+            lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+            if not lines:
                 continue
-            score = _score_page(text, lines)
-            candidates[stmt_type].append((score, i))
+
+            for stmt_type, keywords in _PAGE_KEYWORDS.items():
+                # Must be a heading — keyword in first 10 lines as a short line
+                if not _keyword_in_heading(lines, keywords):
+                    continue
+                score = _score_page(text, lines)
+                candidates[stmt_type].append((score, i, column))
 
     for stmt_type, scored in candidates.items():
         if not scored:
             continue
-        best_score, best_idx = max(scored, key=lambda x: x[0])
+        best_score, best_idx, best_col = max(scored, key=lambda x: x[0])
 
         # Only look back if the best page is a continuation (not the statement start)
-        best_text = get_sorted_text(best_idx).lower()
+        best_text = get_sorted_text(best_idx, best_col).lower()
         is_contd = any(m in best_text[:200] for m in ["(contd.)", "(continued)", "continued..."])
 
-        pages = []
+        pages: list[tuple[int, str]] = []
         if is_contd and best_idx > 0:
-            pages.append(best_idx - 1)
-        pages.append(best_idx)
+            pages.append((best_idx - 1, best_col))
+        pages.append((best_idx, best_col))
+
+        # If the OPPOSITE column of this same page has the SAME statement's
+        # heading too, it's one statement flowing across both halves (e.g.
+        # Maruti's Cash Flow: operating activities in the left column,
+        # investing/financing in the right — both columns say "Standalone
+        # Statement of Cash Flows"). Different statements sharing a page
+        # (Balance Sheet left / P&L right) have DIFFERENT headings per side,
+        # so this check only fires for genuine continuations.
+        if best_col in ("left", "right"):
+            opposite_col = "right" if best_col == "left" else "left"
+            opp_text = get_sorted_text(best_idx, opposite_col)
+            opp_lines = [ln.strip() for ln in opp_text.split('\n') if ln.strip()]
+            if opp_lines and _keyword_in_heading(opp_lines, _PAGE_KEYWORDS[stmt_type]):
+                pages.append((best_idx, opposite_col))
+
         for offset in (1, 2, 3):
             next_idx = best_idx + offset
             if next_idx >= total_pages:
                 break
-            next_text = get_sorted_text(next_idx)
+            # Continuation pages are checked in the SAME column as the match —
+            # in side-by-side layouts, a statement keeps its column position
+            # across pages rather than switching sides.
+            next_text = get_sorted_text(next_idx, best_col)
             next_lines = [ln.strip() for ln in next_text.split('\n') if ln.strip()]
-            # Stop if the next page opens a DIFFERENT type of financial statement.
-            # This prevents consolidated + standalone versions from being merged.
+            # Stop if the next page opens a DIFFERENT type of financial statement,
+            # OR a different report section entirely (Changes in Equity, Notes).
+            # This prevents consolidated + standalone versions — and unrelated
+            # sections — from being merged into the statement being extracted.
             is_new_statement = any(
                 other_type != stmt_type and _keyword_in_heading(next_lines, other_kws)
                 for other_type, other_kws in _PAGE_KEYWORDS.items()
-            )
+            ) or _keyword_in_heading(next_lines, _OTHER_SECTION_KEYWORDS)
             if is_new_statement:
                 break
-            pages.append(next_idx)
+            pages.append((next_idx, best_col))
         found[stmt_type] = pages
 
     doc.close()
@@ -272,10 +328,15 @@ def _has_merged_label_artifacts(tables: list[list[list[str]]]) -> bool:
 
 def extract_tables_from_pages(
     pdf_file: bytes | BinaryIO,
-    page_indices: list[int],
+    page_indices: list[int | tuple[int, str]],
 ) -> list[list[list[str]]]:
     """
-    Extract tables from the given page indices.
+    Extract tables from the given page references.
+    Each entry is either a plain page index (ordinary single-column page) or
+    an (index, column) tuple where column is "left"/"right" — for pages
+    where two statements sit side by side, only that half is extracted, so
+    the table data isn't a mix of both statements' columns.
+
     Tries pdfplumber extract_tables() first; if it finds duplication artifacts
     (common in InDesign-generated annual report PDFs) or merged-row artifacts
     (seen in TCS's PDF — see _has_merged_row_artifacts), falls back to parsing
@@ -287,15 +348,26 @@ def extract_tables_from_pages(
     all_tables: list[list[list[str]]] = []
 
     with pdfplumber.open(pdf_file) as pdf:
-        for idx in page_indices:
+        for ref in page_indices:
+            idx, column = ref if isinstance(ref, tuple) else (ref, "full")
             if idx >= len(pdf.pages):
                 continue
             page = pdf.pages[idx]
+            if column == "left":
+                page = page.crop((0, 0, page.width / 2, page.height))
+            elif column == "right":
+                page = page.crop((page.width / 2, 0, page.width, page.height))
 
-            # Try standard table extraction
-            tables = page.extract_tables() or []
-            cleaned = [_clean_table(t) for t in tables if t]
-            cleaned = [t for t in cleaned if t]
+            # pdfplumber's extract_tables() is unreliable on cropped half-pages
+            # (seen on Maruti's column-split BS: it dropped the entire label
+            # column, keeping only "Page No." and the value column). Skip
+            # straight to the text fallback for those; full pages still try
+            # extract_tables() first since it's usually more accurate there.
+            cleaned: list[list[list[str]]] = []
+            if column == "full":
+                tables = page.extract_tables() or []
+                cleaned = [_clean_table(t) for t in tables if t]
+                cleaned = [t for t in cleaned if t]
 
             is_corrupted = cleaned and (
                 _has_duplication_artifacts(cleaned)

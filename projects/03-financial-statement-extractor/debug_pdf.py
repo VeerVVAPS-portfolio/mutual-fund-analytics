@@ -20,11 +20,16 @@ with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         print(f"\n{'='*60}")
         print(f"{stmt.upper()} — pages {page_list}")
 
-        for pg_idx in page_list[:2]:
+        for ref in page_list[:2]:
+            pg_idx, column = ref if isinstance(ref, tuple) else (ref, "full")
             pg = pdf.pages[pg_idx]
+            if column == "left":
+                pg = pg.crop((0, 0, pg.width / 2, pg.height))
+            elif column == "right":
+                pg = pg.crop((pg.width / 2, 0, pg.width, pg.height))
             text = pg.extract_text() or ""
             lines = [l.strip() for l in text.split('\n') if l.strip()]
-            print(f"\n  Page {pg_idx} — first 6 lines:")
+            print(f"\n  Page {pg_idx} [{column}] — first 6 lines:")
             for l in lines[:6]:
                 print(f"    {l}")
             nums = re.findall(r'\b\d{1,3}(?:,\d{2,3})+\b', text)
