@@ -64,14 +64,25 @@ _CONFIRM_PHRASES = [
 
 
 def _keyword_in_heading(lines: list[str], keywords: list[str]) -> bool:
-    """True if any keyword appears as a short line in the first 10 lines of the page."""
+    """
+    True if any keyword appears as a short line in the first 10 lines of the page,
+    AND starts near the beginning of that line.
+    The position check matters: a sentence like "Balance outstanding as at
+    balance sheet date" (a note about loans) is short enough to pass a pure
+    length check, but the keyword appears mid-sentence (idx=27), not as a
+    title. Real headings start with "Consolidated "/"Standalone " (idx ≤ 13)
+    or the bare keyword (idx = 0) — 20 leaves margin for both while still
+    excluding the false positive.
+    """
     for line in lines[:10]:
         line_lower = line.lower().strip()
         if len(line_lower) < 5:
             continue
         for kw in keywords:
+            idx = line_lower.find(kw)
             # Keyword must make up most of the line (it's a heading, not body text)
-            if kw in line_lower and len(line_lower) < len(kw) + 40:
+            # and start near the beginning (allowing "Consolidated "/"Standalone ").
+            if idx != -1 and idx <= 20 and len(line_lower) < len(kw) + 40:
                 return True
     return False
 
@@ -223,6 +234,42 @@ def _has_duplication_artifacts(tables: list[list[list[str]]]) -> bool:
     return total > 0 and (dup / total) > 0.06   # >6% of cells have duplication
 
 
+def _has_merged_row_artifacts(tables: list[list[list[str]]]) -> bool:
+    """
+    Detect a different pdfplumber corruption mode (seen in TCS's PDF, distinct
+    from the Infosys duplication artifact): instead of duplicating values,
+    pdfplumber merges an entire column's worth of numbers into a single cell
+    on one row, leaving the following rows with empty labels and one orphaned
+    value each. Symptom: a cell containing many space-separated number-like
+    tokens (a real value cell has at most 2-3; a merged cell has dozens).
+    """
+    for table in tables:
+        for row in table:
+            for cell in row:
+                if not cell:
+                    continue
+                tokens = cell.split()
+                numericish = sum(1 for t in tokens if re.match(r'^\(?-?[\d,]+\)?$', t))
+                if numericish >= 4:
+                    return True
+    return False
+
+
+def _has_merged_label_artifacts(tables: list[list[list[str]]]) -> bool:
+    """
+    Detect the inverse of _has_merged_row_artifacts (seen in TCS's Cash Flow
+    page): instead of numbers merging into one cell, many distinct line-item
+    LABELS merge into a single oversized label cell, while the value column
+    for that row ends up empty. A real label is well under 100 characters;
+    a row that absorbed a dozen line items runs several hundred.
+    """
+    for table in tables:
+        for row in table:
+            if row and row[0] and len(row[0]) > 150:
+                return True
+    return False
+
+
 def extract_tables_from_pages(
     pdf_file: bytes | BinaryIO,
     page_indices: list[int],
@@ -230,7 +277,8 @@ def extract_tables_from_pages(
     """
     Extract tables from the given page indices.
     Tries pdfplumber extract_tables() first; if it finds duplication artifacts
-    (common in InDesign-generated annual report PDFs), falls back to parsing
+    (common in InDesign-generated annual report PDFs) or merged-row artifacts
+    (seen in TCS's PDF — see _has_merged_row_artifacts), falls back to parsing
     the raw page text with a financial regex instead.
     """
     if isinstance(pdf_file, bytes):
@@ -249,7 +297,12 @@ def extract_tables_from_pages(
             cleaned = [_clean_table(t) for t in tables if t]
             cleaned = [t for t in cleaned if t]
 
-            if cleaned and not _has_duplication_artifacts(cleaned):
+            is_corrupted = cleaned and (
+                _has_duplication_artifacts(cleaned)
+                or _has_merged_row_artifacts(cleaned)
+                or _has_merged_label_artifacts(cleaned)
+            )
+            if cleaned and not is_corrupted:
                 all_tables.extend(cleaned)
             else:
                 # Fallback: parse raw text line by line (clean for most annual reports)
@@ -343,29 +396,42 @@ def _words_to_table(page) -> list[list[str]]:
 
 # ── Text-line fallback ────────────────────────────────────────────────────────
 
-# Matches financial numbers: comma-grouped integers like 162,990 or 1,62,990
-# Also handles negative in parentheses: (12,345)
-_FIN_NUM_RE = re.compile(r'\(?\b\d{1,3}(?:,\d{2,3})+(?:\.\d+)?\b\)?')
+# A single numeric token: comma-grouped (162,990 or 1,62,990), plain (416),
+# or parenthesised for negative (12,345) or (848). One regex for everything —
+# see _text_to_table for why a single unified pass beats separate "comma vs
+# plain" paths.
+_NUM_TOKEN_RE = re.compile(r'\(?-?\d{1,3}(?:,\d{2,3})*\)?')
 
-# Trailing note references like "2.18" or "2.1" that appear after the label
+# Decimal-style note references (Infosys's "2.18", "2.14") — stripped from the
+# line BEFORE token matching. Without this, "Trade payables ... 2.14" (a
+# section header with no values, just a note ref) would have its "2.14" split
+# into two fragments ("2", "14") by _NUM_TOKEN_RE, which then look exactly
+# like a valid pair of year-column values and get wrongly captured as such.
+_DECIMAL_NOTE_REF_RE = re.compile(r'\b\d{1,2}\.\d{1,2}\b')
+
+# Cosmetic only: strips a trailing decimal-style note ref from a label after
+# slicing, so "Other:" rows don't show leftover digits.
 _NOTE_REF_RE = re.compile(r'\s+\d{1,2}\.\d{1,2}\s*$')
-
-# All note references anywhere in a line (used in fallback path)
-# Format is always X.Y or X.YZ where X and Y are 1-2 digits each
-_ALL_NOTE_REFS_RE = re.compile(r'\b\d{1,2}\.\d{1,2}\b')
-
-# Plain integers ≥ 2 digits (used as fallback for values < 1,000 with no comma)
-_PLAIN_INT_RE = re.compile(r'\b(\d{2,})\b')
 
 
 def _text_to_table(text: str) -> list[list[str]]:
     """
     Parse raw page text into a financial table.
 
-    Primary path: finds comma-grouped numbers (162,990) — unambiguous financial values.
-    Fallback path: for lines with no comma-grouped numbers, strips note references
-    (X.Y format like "2.18"), then captures plain integers ≥ 2 digits.
-    This handles small values like Finance Cost = 416 Cr that don't need commas.
+    Finds ALL numeric tokens on a line and takes the LAST one or two as the
+    year-column values — financial statements always show the current/prior
+    year as the rightmost columns, whatever comes before (note references,
+    in any format: Infosys's "2.18", TCS's "16" or "15(a)") is label text.
+
+    This single pass replaces what used to be two separate paths (comma-only,
+    then a plain-integer fallback) after a bug surfaced on TCS's PDF: a row
+    with one comma value and one small plain value — e.g.
+    "Net change in cash and cash equivalents (848) 1,828" — has exactly one
+    comma-formatted number, so the old comma-only path treated "(848)" as
+    part of the label and only captured "1,828", silently dropping the
+    current-year figure. Taking the last two tokens by position, regardless
+    of which format each one uses, fixes this and is simpler than maintaining
+    two diverging code paths.
     """
     rows: list[list[str]] = []
 
@@ -374,35 +440,22 @@ def _text_to_table(text: str) -> list[list[str]]:
         if not line:
             continue
 
-        fin_nums = _FIN_NUM_RE.findall(line)
+        cleaned_line = _DECIMAL_NOTE_REF_RE.sub("", line).strip()
+        matches = [m for m in _NUM_TOKEN_RE.finditer(cleaned_line) if any(c.isdigit() for c in m.group())]
 
-        if fin_nums:
-            # Primary path: comma-formatted numbers found — extract label + values.
-            first_match = _FIN_NUM_RE.search(line)
-            label = line[: first_match.start()].strip()  # type: ignore[union-attr]
+        def make_row(val_matches: list[re.Match]) -> list[str]:
+            label = cleaned_line[: val_matches[0].start()].strip()
             label = _NOTE_REF_RE.sub("", label).strip()
-            rows.append([label] + fin_nums)
-        else:
-            # Fallback path: no comma-formatted numbers.
-            # Strip ALL note references (e.g. "2.18") from the line first,
-            # then look for plain integers at the end — these are values < 1,000 Cr.
-            # Example: "Finance cost  2.18  416  470" → strip "2.18" → find [416, 470]
-            stripped = _ALL_NOTE_REFS_RE.sub("", line).strip()
-            plain_nums = _PLAIN_INT_RE.findall(stripped)
+            return [label] + [m.group() for m in val_matches]
 
-            if len(plain_nums) >= 2 and all(int(n) >= 100 for n in plain_nums[:2]):
-                # Two+ bare integers where both are ≥ 100 → year-column values
-                # (filters out "April 17, 2025" where 17 < 100)
-                first_plain = _PLAIN_INT_RE.search(stripped)
-                label = stripped[: first_plain.start()].strip()  # type: ignore[union-attr]
-                rows.append([label] + plain_nums)
-            elif len(plain_nums) == 1 and int(plain_nums[0]) >= 100:
-                # Single integer ≥ 100 → large enough to be a financial value
-                first_plain = _PLAIN_INT_RE.search(stripped)
-                label = stripped[: first_plain.start()].strip()  # type: ignore[union-attr]
-                rows.append([label] + plain_nums)
-            else:
-                # No usable numbers — section header or label-only row.
-                rows.append([line])
+        if len(matches) >= 2:
+            rows.append(make_row(matches[-2:]))
+        elif len(matches) == 1 and len(re.sub(r'\D', '', matches[0].group())) >= 2:
+            # Single number with >= 2 digits — large enough to be a real value
+            # (filters out stray single-digit footnote markers)
+            rows.append(make_row(matches[-1:]))
+        else:
+            # No usable numbers — section header or label-only row.
+            rows.append([line])
 
     return rows
