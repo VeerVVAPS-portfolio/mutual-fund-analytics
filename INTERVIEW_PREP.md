@@ -268,10 +268,35 @@ Systems thinking — breaking a complex problem (PDF → structured data) into d
 The page-locating scan took 157 seconds on a 369-page annual report because I was using pdfplumber's `extract_text()` for every page — a method optimized for accurate character-level layout reconstruction, which is expensive and unnecessary when you just need to check for heading keywords. Switched to PyMuPDF for that scan (50x faster), then added a cheap pre-filter pass (plain substring search) to cut the number of pages needing the more expensive sorted-text extraction from 369 to ~70. Final time: ~9 seconds. The lesson: profile before optimizing, and match the tool's cost to what the task actually needs — don't use a precision instrument for a coarse filter.
 
 **Q: What are known limitations of the current extraction?**
-Three: (1) When a company breaks a line item into sub-components with no parent total (e.g. TCS shows "Trade receivables" as a bare header with "Billed"/"Unbilled" as the actual value-bearing children), only the first matching sub-item is captured — the tool takes one line per category, not a sum. (2) "Tax" captures current tax only; deferred tax shows separately under "Other" rather than being netted in. (3) Scanned PDFs need OCR — out of scope for this portfolio version.
+Five, in order of how often they bite: (1) When a company breaks a line item into sub-components with no parent total (e.g. TCS shows "Trade receivables" as a bare header with "Billed"/"Unbilled" as the children), only the first matching sub-item is captured — one line per category, not a sum. (2) "Tax" captures current tax only; deferred tax shows separately under "Other". (3) Banks and financial conglomerates aren't supported — confirmed on HDFC Bank, where even page-finding fails because their reports are large enough (585 pages, plus an insurance subsidiary) that statement names turn up constantly in unrelated prose. (4) Unusual column layouts can split a label column from its values at a boundary the two-column model doesn't expect (Page Industries' Cash Flow page). (5) Scanned PDFs need OCR — out of scope for this portfolio version.
 
 **Q: Does this work on annual reports from companies other than Infosys?**
-Yes — validated against TCS's AR 2024-25 (336 pages) after building entirely against Infosys. Testing surfaced four distinct bugs invisible in single-company testing: two different pdfplumber table-corruption modes pdfplumber hadn't shown on Infosys's PDF (values merging into one cell vs. labels merging into one cell), a heading false-positive (a note sentence "...as at balance sheet date" scoring as a real Balance Sheet heading), and a note-reference format difference (TCS uses plain integers like "16" for note numbers; Infosys uses decimals like "2.18") that required unifying two separate parsing code paths into one. After the fixes, both companies' P&L/BS/CF reconcile exactly (TCS: Total Assets 1,59,629 Cr = Non-Current + Current; Equity + Liabilities also balances to the rupee). This is good evidence the architecture generalizes within the same risk class (Indian IT services, Ind AS format) — companies with structurally different statements (banks, manufacturers, non-Indian filings) haven't been tested and would likely need additional synonym/heuristic work.
+Tested against 6 companies spanning 5 sectors and 2 market-cap tiers: Infosys and TCS (IT services), Maruti Suzuki (auto manufacturing), Asian Paints (FMCG/paints), HDFC Bank (banking), Dr. Reddy's (pharma), and Page Industries (apparel, mid-cap). Results:
+
+| Company | Sector | P&L | Balance Sheet | Cash Flow |
+|---|---|---|---|---|
+| Infosys | IT services | ✓ | ✓ balances | ✓ reconciles |
+| TCS | IT services | ✓ | ✓ balances | ✓ reconciles |
+| Maruti Suzuki | Auto manufacturing | ✓ | ✓ balances | ✓ reconciles |
+| Asian Paints | FMCG/paints | ✓ | ✓ balances | ✓ reconciles |
+| Dr. Reddy's | Pharma | ✓ | ✓ balances | ✓ reconciles (~16 Cr forex gap) |
+| Page Industries | Apparel, mid-cap | ✓ | ✓ balances | ✗ — wide-label layout splits label/value columns at an unexpected boundary |
+| HDFC Bank | Banking + insurance | ✗ | ✗ | ✗ — page-finding itself fails |
+
+4/6 fully reconcile end to end; a 5th (Page Industries) gets P&L and Balance Sheet right but not Cash Flow. Only the bank failed comprehensively — confirming the original risk assessment that banks need fundamentally different schema/heuristics (Advances/Deposits instead of Trade Receivables/Payables), not just new synonyms.
+
+**The real lesson from this round: most bugs weren't wrong synonyms, they were "this looks like a heading but isn't."** Annual reports are full of sentences that incidentally contain statement names:
+- Auditor's reports describing what they audited ("comprise the Standalone Balance Sheet as at...")
+- Notes about "on-balance sheet exposures" (securitisation, a banking-specific note)
+- CEO/CFO compliance certificates declaring "we have reviewed... the cash flow statement"
+- Notes sections with company-specific names: "Schedules to the..." (HDFC), "Explanatory notes to..." (Page Industries) — neither matched the generic "Notes to the..." exclusion
+- A note sentence ("...as at balance sheet date") scoring as a real heading purely on line length
+
+Each fix added a targeted exclusion (a phrase list, a position check, a "does this page's own header announce it's Notes/Schedules/a Compliance Certificate" pre-check) rather than a blanket rule — false-positive elimination this specific doesn't generalize from one rule; it has to be discovered company by company.
+
+**Two structural bugs also needed real architecture, not synonyms:**
+- pdfplumber's `extract_tables()` has at least 3 distinct corruption modes across companies tested: duplicated cell values (Infosys), an entire column's values merged into one cell (TCS), and all labels merged into one cell with an empty value cell (TCS's Cash Flow page). All three needed detection heuristics that fall back to text-based parsing.
+- Some reports run two statements side by side on one physical page (Maruti: Balance Sheet + P&L share a page, each in a half-width column). Page references became `(page_index, column)` tuples, and pdfplumber's table extraction had to be skipped entirely for cropped half-pages (it dropped the label column under cropping) in favor of the text fallback.
 
 **Verified extraction results (Infosys AR 2025):**
 | Metric | Extracted | Correct |
