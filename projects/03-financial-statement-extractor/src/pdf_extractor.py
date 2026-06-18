@@ -121,6 +121,21 @@ def _keyword_in_heading(lines: list[str], keywords: list[str]) -> bool:
             # and start near the beginning (allowing "Consolidated "/"Standalone ").
             if idx != -1 and idx <= 20 and len(line_lower) < len(kw) + 40:
                 return True
+
+        # Letter-spaced stylised titles (HDFC Bank renders major statement
+        # headings as "S TA N D A L O N E B A L A N C E S H E E T" — likely
+        # a font/kerning artifact in the PDF's text layer). A normal
+        # substring check never matches "balance sheet" against that, so the
+        # real heading page never even becomes a candidate while body-text
+        # mentions elsewhere keep winning instead. Detected by: most tokens
+        # on the line are short (<=2 chars) — true sentences don't look
+        # like that — then compare with all spaces removed.
+        tokens = line_lower.split()
+        if tokens and (sum(len(t) <= 2 for t in tokens) / len(tokens)) >= 0.7:
+            despaced = line_lower.replace(" ", "")
+            for kw in keywords:
+                if kw.replace(" ", "") in despaced:
+                    return True
     return False
 
 
