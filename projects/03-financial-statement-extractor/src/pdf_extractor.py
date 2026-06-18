@@ -61,6 +61,7 @@ _OTHER_SECTION_KEYWORDS = [
     "notes to the",
     "notes to standalone",
     "notes to consolidated",
+    "schedules to the",  # HDFC Bank's name for its Notes section
 ]
 
 # Phrases that strongly confirm a page is the ACTUAL financial statement
@@ -73,6 +74,19 @@ _CONFIRM_PHRASES = [
     "in lakhs",
     "rs. in",
     "inr in",
+]
+
+
+# Compound terms that contain "balance sheet" (or other statement keywords)
+# as a substring without being the statement itself — e.g. bank annual
+# reports have extensive notes on "on-balance sheet exposures" / "off-balance
+# sheet exposures" (securitisation, contingent liabilities) that would
+# otherwise pass the heading check (short line, keyword near the start).
+_HEADING_FALSE_POSITIVES = [
+    "on-balance sheet",
+    "off-balance sheet",
+    "on balance sheet",
+    "off balance sheet",
 ]
 
 
@@ -90,6 +104,15 @@ def _keyword_in_heading(lines: list[str], keywords: list[str]) -> bool:
     for line in lines[:10]:
         line_lower = line.lower().strip()
         if len(line_lower) < 5:
+            continue
+        if any(fp in line_lower for fp in _HEADING_FALSE_POSITIVES):
+            continue
+        # Auditor's reports enumerate findings as "(a) ...", "(b) ...", and
+        # routinely name all three statements in one sentence — e.g.
+        # "(c) The Standalone Balance Sheet, the Standalone Profit and Loss
+        # Account...". A line starting with a lettered/numbered list marker
+        # is prose, never an actual statement title.
+        if re.match(r'^\(?[a-z0-9ivx]{1,4}[\)\.]\s', line_lower):
             continue
         for kw in keywords:
             idx = line_lower.find(kw)
@@ -204,6 +227,35 @@ def find_statement_pages(pdf_file: bytes | BinaryIO) -> dict[str, list[int]]:
     # page (e.g. Maruti's Balance Sheet + P&L) — the unsplit text is too long
     # to pass the heading-length check, but each half on its own reads clean.
     for i in candidate_pages:
+        # Running-header check: if the page's own header announces it's part
+        # of the Notes/Schedules section, skip the WHOLE page (all column
+        # views) — no individual line should be able to override that, since
+        # accounting-policy prose routinely contains short, early-starting
+        # lines like "Consolidated Balance Sheet when they are sold..." that
+        # would otherwise pass the heading check below. Checked on the FULL,
+        # uncropped page text: a page-wide title can straddle the left/right
+        # crop boundary and come out garbled in either half alone (seen on
+        # HDFC Bank's "SCHEDULES TO THE..." header, which is titled this way
+        # rather than the more common "Notes to the ...").
+        full_text = get_sorted_text(i, "full")
+        full_lines = [ln.strip() for ln in full_text.split("\n") if ln.strip()]
+        header_zone = " ".join(full_lines[:3]).lower()
+        if "schedules to the" in header_zone or "notes to the" in header_zone:
+            continue
+        # Auditor's reports ("Independent Auditor's Report") describe what
+        # they audited in full sentences — "comprise the Standalone Balance
+        # Sheet as at March 31, ... and the Standalone Cash Flow Statement
+        # for the year then ended" — which routinely passes the heading
+        # check below despite being prose, not a title. Every Indian
+        # auditor's report opens "To the Members of [Company]" within its
+        # first ~10 lines; broader window than the 3-line check above since
+        # the report's own title is sometimes rendered as letter-spaced
+        # stylised text ("I N D E P E N D E N T A U...") that doesn't match
+        # a plain "independent auditor" substring check.
+        wide_header_zone = " ".join(full_lines[:10]).lower()
+        if "to the members of" in wide_header_zone:
+            continue
+
         for column in ("full", "left", "right"):
             text = get_sorted_text(i, column)
             lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
