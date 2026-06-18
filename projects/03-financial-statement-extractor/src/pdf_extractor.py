@@ -61,7 +61,8 @@ _OTHER_SECTION_KEYWORDS = [
     "notes to the",
     "notes to standalone",
     "notes to consolidated",
-    "schedules to the",  # HDFC Bank's name for its Notes section
+    "schedules to the",     # HDFC Bank's name for its Notes section
+    "explanatory notes",    # Page Industries' name for supplementary notes
 ]
 
 # Phrases that strongly confirm a page is the ACTUAL financial statement
@@ -240,7 +241,16 @@ def find_statement_pages(pdf_file: bytes | BinaryIO) -> dict[str, list[int]]:
         full_text = get_sorted_text(i, "full")
         full_lines = [ln.strip() for ln in full_text.split("\n") if ln.strip()]
         header_zone = " ".join(full_lines[:3]).lower()
-        if "schedules to the" in header_zone or "notes to the" in header_zone:
+        if ("schedules to the" in header_zone or "notes to the" in header_zone
+                or "explanatory notes" in header_zone):
+            continue
+        # CEO/CFO "Compliance Certificate" (a standard SEBI corporate-
+        # governance filing) declares "We have reviewed financial statements
+        # and the cash flow statement for the year ended..." as boilerplate —
+        # passes the heading check on its own despite not being the actual
+        # statement. Page Industries titles this section "CORPORATE
+        # GOVERNANCE / COMPLIANCE CERTIFICATE".
+        if "compliance certificate" in header_zone:
             continue
         # Auditor's reports ("Independent Auditor's Report") describe what
         # they audited in full sentences — "comprise the Standalone Balance
