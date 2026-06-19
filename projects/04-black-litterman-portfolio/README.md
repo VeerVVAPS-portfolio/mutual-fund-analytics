@@ -1,5 +1,7 @@
 # Black-Litterman Portfolio Construction
 
+[![Live Dashboard](https://img.shields.io/badge/Live%20Dashboard-Streamlit-FF4B4B?logo=streamlit)](https://mutual-fund-analytics-drxhyomvnbchzesuoxh2ro.streamlit.app/)
+
 Rebuilds an Excel-based Black-Litterman portfolio model — originally built for a ₹100 Cr multi-asset investment-club case competition — as a reproducible Python pipeline and interactive dashboard. The original Excel's price history is the data source (extracted from its embedded raw sheets, not refetched), so the numbers below trace directly back to that source.
 
 ## The Problem with Naive Portfolio Optimization
