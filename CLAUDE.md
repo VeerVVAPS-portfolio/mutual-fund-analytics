@@ -61,8 +61,9 @@ If Project 1 has never been run, fund recommendations are skipped silently.
 - Data files in `data/raw/` and `data/processed/` are gitignored (large/auto-generated). `output/` is also gitignored.
 
 ## Deployment
-Both projects are deployed on Streamlit Community Cloud pointing to this GitHub repo:
+Projects are deployed on Streamlit Community Cloud pointing to this GitHub repo:
 - Project 1 main file: `projects/01-mutual-fund-analytics-automation/dashboard/app.py`
 - Project 2 main file: `projects/02-ai-financial-profile-asset-allocation/dashboard/app.py`
+- Project 4 main file: `projects/04-black-litterman-portfolio/dashboard/app.py`
 
-Each project's `requirements.txt` is picked up automatically by Streamlit Cloud (it walks up from the main file's directory).
+**Streamlit Cloud installs the repo-ROOT `requirements.txt` for every app, not the per-project one** — confirmed via a deploy failure (`ModuleNotFoundError: scipy` on Project 4, even though it was listed in that project's own `requirements.txt`). Each per-project `requirements.txt` still documents that project's own dependencies for local `pip install -r requirements.txt`, but the root `requirements.txt` must be kept as the union of every deployed project's dependencies, or new apps will fail to deploy and existing ones may silently degrade (e.g. a `try/except`-guarded import failing and falling back to demo mode without it being obvious from the UI).

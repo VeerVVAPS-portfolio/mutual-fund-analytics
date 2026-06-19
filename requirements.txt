@@ -1,6 +1,27 @@
-pandas>=2.0
+# Streamlit Community Cloud installs this ROOT requirements.txt for every
+# app in this repo, regardless of which project's dashboard/app.py is the
+# deploy target (confirmed via Project 4's deploy log — it does NOT walk up
+# from the main file's directory to use a per-project requirements.txt).
+# Keep this as the union of every deployed project's dependencies.
+
+# Project 1 — Mutual Fund Analytics Automation
 requests>=2.28
 yfinance>=0.2
+
+# Project 2 — AI Asset Allocator
+openai>=1.0
+python-dotenv>=1.0
+
+# Project 3 — Financial Statement Extractor
+pdfplumber>=0.10
+pymupdf>=1.24
+
+# Project 4 — Black-Litterman Portfolio
+numpy>=1.24
+scipy>=1.10
+
+# Shared across projects
+pandas>=2.0
 openpyxl>=3.1
 streamlit>=1.35
 plotly>=5.0
