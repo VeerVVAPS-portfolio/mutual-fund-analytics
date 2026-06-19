@@ -17,7 +17,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from pdf_extractor import extract_tables_from_pages, find_statement_pages
 from statement_parser import identify_statement_table, normalize_table, stitch_years
-from excel_builder import build_excel
+from excel_builder import build_excel, _compute_ratios
 
 # ── Page config ───────────────────────────────────────────────────────────────
 
@@ -158,6 +158,17 @@ html, body, [class*="css"] {
     border-radius: 0 6px 6px 0; padding: 0.7rem 1rem;
     font-size: 0.8rem; color: var(--sky); margin-bottom: 1rem;
     background: rgba(56,189,248,0.03);
+}
+.error-banner {
+    display: flex; align-items: flex-start; gap: 0.6rem;
+    border: 1px solid rgba(239,68,68,0.15); border-left: 2px solid var(--red);
+    border-radius: 0 6px 6px 0; padding: 0.9rem 1rem;
+    font-size: 0.85rem; color: var(--red); margin-bottom: 1rem;
+    background: rgba(239,68,68,0.03); line-height: 1.6;
+}
+.unmatched-note {
+    font-size: 0.72rem; color: var(--amber); margin-top: 0.4rem;
+    display: flex; align-items: center; gap: 0.35rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -331,8 +342,21 @@ if st.session_state.results:
     warnings = res["warnings"]
     company  = res["company"]
 
+    nothing_extracted = not pnl and not bs and not cf
+
     _, res_col, _ = st.columns([1, 2.4, 1])
     with res_col:
+        if nothing_extracted:
+            st.markdown(
+                '<div class="error-banner">'
+                '<i class="bi bi-x-circle" style="flex-shrink:0;margin-top:0.1rem"></i>'
+                '<span><strong>Nothing could be extracted.</strong> This usually means the PDF is scanned/image-based '
+                '(no selectable text), or its financial statements use a layout the parser doesn\'t recognise yet. '
+                'Try a different annual report, or confirm the PDF has selectable text by searching for a word in it.</span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
         # Warnings
         for w in warnings:
             st.markdown(
@@ -365,15 +389,27 @@ if st.session_state.results:
         # Download button
         if st.session_state.excel_bytes:
             filename = f"{company.replace(' ', '_')}_financials.xlsx"
-            st.download_button(
-                label="⬇ Download Excel",
-                data=st.session_state.excel_bytes,
-                file_name=filename,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                type="primary",
-                use_container_width=True,
-            )
+            dl_col, reset_col = st.columns([3, 1])
+            with dl_col:
+                st.download_button(
+                    label="⬇ Download Excel",
+                    data=st.session_state.excel_bytes,
+                    file_name=filename,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    type="primary",
+                    use_container_width=True,
+                )
+            with reset_col:
+                if st.button("Try another ↺", use_container_width=True):
+                    st.session_state.results = None
+                    st.session_state.excel_bytes = None
+                    st.rerun()
             st.markdown("<br>", unsafe_allow_html=True)
+        elif nothing_extracted:
+            if st.button("Try another file ↺", use_container_width=True):
+                st.session_state.results = None
+                st.session_state.excel_bytes = None
+                st.rerun()
 
     # ── Preview tabs ──────────────────────────────────────────────────────────
     def stmts_to_df(data: dict) -> pd.DataFrame:
@@ -386,28 +422,60 @@ if st.session_state.results:
             rows.append(row)
         return pd.DataFrame(rows).set_index("Line Item")
 
-    tab1, tab2, tab3 = st.tabs(["  P&L  ", "  Balance Sheet  ", "  Cash Flow  "])
+    def render_statement_tab(data: dict, empty_message: str) -> None:
+        if not data:
+            st.info(empty_message)
+            return
+        df = stmts_to_df(data)
+        n_unmatched = sum(1 for label in df.index if label.startswith("Other:"))
+        styled = df.style.apply(
+            lambda row: ["background-color: rgba(245,158,11,0.08)" if row.name.startswith("Other:") else "" for _ in row],
+            axis=1,
+        )
+        height = 500 if len(df) > 12 else 400
+        st.dataframe(styled, use_container_width=True, height=height)
+        if n_unmatched:
+            st.markdown(
+                f'<div class="unmatched-note"><i class="bi bi-exclamation-circle"></i> '
+                f'{n_unmatched} row(s) highlighted amber didn\'t match a known line item — '
+                f'verify these against the source PDF before relying on them.</div>',
+                unsafe_allow_html=True,
+            )
+
+    def ratios_to_df(pnl_data: dict, bs_data: dict) -> pd.DataFrame:
+        years = []
+        for d in [pnl_data, bs_data]:
+            for item_data in d.values():
+                for y in item_data:
+                    if y not in years:
+                        years.append(y)
+        if not years or not pnl_data or not bs_data:
+            return pd.DataFrame()
+        ratios = _compute_ratios(pnl_data, bs_data, years)
+        rows = []
+        for category, name, year_vals in ratios:
+            row = {"Category": category, "Ratio": name}
+            row.update(year_vals)
+            rows.append(row)
+        return pd.DataFrame(rows).set_index(["Category", "Ratio"])
+
+    tab1, tab2, tab3, tab4 = st.tabs(["  P&L  ", "  Balance Sheet  ", "  Cash Flow  ", "  Ratios  "])
 
     with tab1:
-        if pnl:
-            df = stmts_to_df(pnl)
-            st.dataframe(df, use_container_width=True, height=500)
-        else:
-            st.info("P&L statement could not be extracted from the uploaded files.")
+        render_statement_tab(pnl, "P&L statement could not be extracted from the uploaded files.")
 
     with tab2:
-        if bs:
-            df = stmts_to_df(bs)
-            st.dataframe(df, use_container_width=True, height=500)
-        else:
-            st.info("Balance Sheet could not be extracted from the uploaded files.")
+        render_statement_tab(bs, "Balance Sheet could not be extracted from the uploaded files.")
 
     with tab3:
-        if cf:
-            df = stmts_to_df(cf)
-            st.dataframe(df, use_container_width=True, height=400)
+        render_statement_tab(cf, "Cash Flow statement could not be extracted from the uploaded files.")
+
+    with tab4:
+        ratios_df = ratios_to_df(pnl, bs)
+        if not ratios_df.empty:
+            st.dataframe(ratios_df, use_container_width=True, height=350)
         else:
-            st.info("Cash Flow statement could not be extracted from the uploaded files.")
+            st.info("Ratios need both P&L and Balance Sheet data — at least one of those couldn't be extracted.")
 
     # ── Footer ────────────────────────────────────────────────────────────────
     st.markdown(
