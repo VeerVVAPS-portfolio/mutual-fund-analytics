@@ -20,6 +20,9 @@ pymupdf>=1.24
 numpy>=1.24
 scipy>=1.10
 
+# Project 6 — Goal-Based Wealth Planner
+reportlab>=4.0
+
 # Shared across projects
 pandas>=2.0
 openpyxl>=3.1
