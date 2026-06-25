@@ -19,9 +19,12 @@ Redesigned_portfolio.xlsx
 PROGRESS.md
 linkedin_posts/
 
-# PDF uploads for Project 3 — user-provided, not versioned
-projects/03-financial-statement-extractor/*.pdf
-
 # Source Excel (large) and generated output for Project 4 — reproducible by running the pipeline
 projects/04-black-litterman-portfolio/data/raw/
 projects/04-black-litterman-portfolio/output/
+
+# Per-ticker scraped data and generated reports for Project 7 — reproducible by re-running the pipeline,
+# except the sample report PDF kept as a portfolio showcase artifact
+projects/07-equity-research-platform/data/*/*
+!projects/07-equity-research-platform/data/*/*_Equity_Research_Report.pdf
+projects/07-equity-research-platform/data/*/_REFERENCE_*.pdf
