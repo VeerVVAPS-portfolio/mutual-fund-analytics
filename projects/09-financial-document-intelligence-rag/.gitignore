@@ -1,0 +1,14 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Raw source PDFs — large (10–40 MB each), downloaded separately, not committed.
+# The committed index artifacts under data/index/ are what the app actually
+# needs at runtime.
+data/docs/
+
+# Local fastembed model cache, if it lands inside the project
+.fastembed_cache/

@@ -1,0 +1,16 @@
+# Project 9 — Financial Document Intelligence (RAG)
+# Local install:  pip install -r requirements.txt
+# NOTE: Streamlit Cloud installs the repo-ROOT requirements.txt, not this file.
+#       Keep the root file in sync (these three lines are added there too).
+
+streamlit>=1.35
+numpy>=1.24
+
+# RAG stack
+pymupdf>=1.23        # PDF text extraction (imported as `fitz`)
+fastembed>=0.3       # local ONNX embeddings (BAAI/bge-small-en-v1.5), no PyTorch
+chromadb>=0.5        # in-memory vector store + metadata filtering
+
+# LLM synthesis (Groq via the OpenAI-compatible SDK) — optional at runtime
+openai>=1.0
+python-dotenv>=1.0

@@ -19,6 +19,14 @@ scipy>=1.10
 # Project 6 — Goal-Based Wealth Planner
 reportlab>=4.0
 
+# Project 8 — TrueSIP (integrates Projects 1/2/6: reuses openai, pandas,
+# streamlit, plotly, reportlab — introduces NO new dependencies)
+
+# Project 9 — Financial Document Intelligence (RAG)
+pymupdf>=1.23        # PDF text extraction (imported as `fitz`)
+fastembed>=0.3       # local ONNX embeddings (bge-small-en), no PyTorch
+chromadb>=0.5        # in-memory vector store + metadata filtering
+
 # Shared across projects
 pandas>=2.0
 openpyxl>=3.1
