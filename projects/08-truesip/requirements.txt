@@ -1,0 +1,11 @@
+# TrueSIP — local install: `pip install -r requirements.txt`
+#
+# NOTE: Streamlit Community Cloud installs the repo-ROOT requirements.txt for
+# every app in this monorepo, NOT this per-project file. This file documents
+# TrueSIP's own dependencies for local development. TrueSIP adds no new
+# dependency beyond what the root union already carries.
+streamlit>=1.35
+pandas>=2.0
+plotly>=5.0
+openai>=1.0         # Groq via the OpenAI-compatible endpoint (the explain-why layer)
+python-dotenv>=1.0  # local GROQ_API_KEY loading
